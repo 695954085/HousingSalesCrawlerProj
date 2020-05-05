@@ -1,25 +1,25 @@
 package com.example.githubcrawler;
 
-import sun.net.www.http.HttpClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import us.codecraft.webmagic.Page;
 import us.codecraft.webmagic.Site;
 import us.codecraft.webmagic.Spider;
+import us.codecraft.webmagic.pipeline.JsonFilePipeline;
 import us.codecraft.webmagic.processor.PageProcessor;
 
 public class GithubRepoPageProcessor implements PageProcessor {
 
-    private Site site = Site.me().setRetryTimes(3).setSleepTime(1000);
+    private final Logger logger = LoggerFactory.getLogger(getClass());
+
+    private Site site = Site.me().setRetryTimes(3).setSleepTime(1000).setUserAgent("Apache-HttpClient/4.5.12 (Java/1.8.0_191)");
 
     @Override
     public void process(Page page) {
-        page.addTargetRequests(page.getHtml().links().regex("(https://github\\.com/\\w+/\\w+)").all());
-        page.putField("author", page.getUrl().regex("https://github\\.com/(\\w+)/.*").toString());
-        page.putField("name", page.getHtml().xpath("//h1[@class='entry-title public']/strong/a/text()").toString());
-        if (page.getResultItems().get("name")==null){
-            //skip this page
-            page.setSkip(true);
-        }
-        page.putField("readme", page.getHtml().xpath("//div[@id='readme']/tidyText()"));
+//        page.putField("name", page.getHtml().xpath("//div[@class='npic']//a/@href").toString());
+        page.addTargetRequest(page.getHtml().xpath("//div[@class='npic']//a/@href").toString());
+        System.out.println(page.getUrl().toString());
+        page.putField("totalNum", page.getHtml().xpath("//table//tr[3]/td[2]//span/text()").toString());
     }
 
     @Override
@@ -28,8 +28,6 @@ public class GithubRepoPageProcessor implements PageProcessor {
     }
 
     public static void main(String[] args) {
-
-
-        Spider.create(new GithubRepoPageProcessor()).addUrl("http://www.fslos.com/news83507.html").thread(5).run();
+        Spider.create(new GithubRepoPageProcessor()).addPipeline(new JsonFilePipeline("C:\\Users\\Administrator\\Desktop")).addUrl("http://www.fslos.com/news.aspx?id=102").thread(5).run();
     }
 }
