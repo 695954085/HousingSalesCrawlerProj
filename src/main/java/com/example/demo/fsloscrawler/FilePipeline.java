@@ -1,6 +1,7 @@
 package com.example.demo.fsloscrawler;
 
 import com.alibaba.fastjson.JSON;
+import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,6 +19,7 @@ import java.io.PrintWriter;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -40,9 +42,6 @@ public class FilePipeline extends FilePersistentBase implements Pipeline {
     @Value("${resultItems.modificationTime}")
     private String modificationTime;
 
-    @Value("classpath:${Pipeline.fileName}")
-    private Resource resource;
-
     @PostConstruct
     private void init() {
         setPath(path);
@@ -51,8 +50,8 @@ public class FilePipeline extends FilePersistentBase implements Pipeline {
     @Override
     public void process(ResultItems resultItems, Task task) {
         try {
-            File file = resource.getFile();
-            byte[] bytes = Files.readAllBytes(file.toPath());
+            logger.info(Paths.get("./" + fileName).toFile().getAbsolutePath());
+            byte[] bytes = Files.readAllBytes(Paths.get("./" + fileName));
             Map<String, Object> fslosData = (Map<String, Object>) JSON.parse(new String(bytes, StandardCharsets.UTF_8));
             String modificationTimeStr = resultItems.get(modificationTime);
             String oldModificationTimeStr = (String) fslosData.get(modificationTime);
@@ -78,9 +77,9 @@ public class FilePipeline extends FilePersistentBase implements Pipeline {
                     }
                 }
                 fslosData.put(modificationTime, modificationTimeStr);
-                PrintWriter printWriter = new PrintWriter(file);
-                printWriter.write(JSON.toJSONString(fslosData));
-                printWriter.close();
+                try(PrintWriter printWriter = new PrintWriter(Paths.get("./" + fileName).toFile())) {
+                    printWriter.write(JSON.toJSONString(fslosData));
+                }
             }
         } catch (IOException e) {
             logger.warn("write file error", e);

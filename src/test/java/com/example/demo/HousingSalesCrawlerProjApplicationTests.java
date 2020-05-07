@@ -11,6 +11,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
 import org.springframework.test.context.support.AnnotationConfigContextLoader;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
@@ -23,6 +24,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import static org.junit.Assert.assertTrue;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -71,5 +74,19 @@ class HousingSalesCrawlerProjApplicationTests {
 //        mvc.perform(MockMvcRequestBuilders.get("/housingSalesData")).andExpect(MockMvcResultMatchers.status().isOk()).andExpect(MockMvcResultMatchers.content().json());
     }
 
+    @Test
+    void whenUsingSystemProperties_thenReturnCurrentDirectory() {
+        String userDirectory = System.getProperty("user.dir");
+        System.out.println(userDirectory);
+//        assertTrue(userDirectory.endsWith(CURRENT_DIR));
+    }
 
+    @Value("file:src/main/resources/${Pipeline.fileName}")
+    private Resource resourceInSrc;
+
+    @Test
+    void testFileResource() throws IOException {
+        File file = resourceInSrc.getFile();
+        System.out.println(file.toPath().toString());
+    }
 }
