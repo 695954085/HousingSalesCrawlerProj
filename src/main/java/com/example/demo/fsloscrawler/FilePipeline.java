@@ -30,9 +30,6 @@ public class FilePipeline extends FilePersistentBase implements Pipeline {
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
-    @Value("${Pipeline.path}")
-    private String path;
-
     @Value("${Pipeline.fileName}")
     private String fileName;
 
@@ -41,11 +38,6 @@ public class FilePipeline extends FilePersistentBase implements Pipeline {
 
     @Value("${resultItems.modificationTime}")
     private String modificationTime;
-
-    @PostConstruct
-    private void init() {
-        setPath(path);
-    }
 
     @Override
     public void process(ResultItems resultItems, Task task) {

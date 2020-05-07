@@ -22,6 +22,11 @@ import us.codecraft.webmagic.Spider;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -88,5 +93,17 @@ class HousingSalesCrawlerProjApplicationTests {
     void testFileResource() throws IOException {
         File file = resourceInSrc.getFile();
         System.out.println(file.toPath().toString());
+    }
+
+    @Test
+    void testDayDiffer() throws ParseException {
+        String str = "2020年2月1日";
+        String str1 = "2019年12月30日";
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy年MM月dd日");
+        Date parse = sdf.parse(str);
+        Date parse1 = sdf.parse(str1);
+        long diffInMillies = Math.abs(parse1.getTime() - parse.getTime());
+        long diff = TimeUnit.DAYS.convert(diffInMillies, TimeUnit.MILLISECONDS);
+        System.out.println(diff);
     }
 }
