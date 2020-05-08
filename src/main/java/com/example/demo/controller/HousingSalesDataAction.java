@@ -9,17 +9,18 @@ import org.springframework.web.bind.annotation.RestController;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Paths;
 
 @RestController
 public class HousingSalesDataAction {
 
-    @Value("classpath:${Pipeline.fileName}")
-    private Resource resource;
+    @Value("${Pipeline.fileName}")
+    private String fileName;
 
     @CrossOrigin
     @GetMapping("/housingSalesData")
     public String housingSalesData() throws IOException {
-        byte[] bytes = Files.readAllBytes(resource.getFile().toPath());
+        byte[] bytes = Files.readAllBytes(Paths.get(fileName));
         return new String(bytes, StandardCharsets.UTF_8);
     }
 }

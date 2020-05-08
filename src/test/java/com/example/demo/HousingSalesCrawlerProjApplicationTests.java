@@ -4,6 +4,8 @@ import com.example.demo.controller.HousingSalesDataAction;
 import com.example.demo.fsloscrawler.FilePipeline;
 import com.example.demo.fsloscrawler.FslosPageProcessor;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -17,15 +19,21 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import us.codecraft.webmagic.Request;
 import us.codecraft.webmagic.Spider;
+import us.codecraft.webmagic.SpiderListener;
 
+import javax.swing.plaf.TableHeaderUI;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -47,6 +55,8 @@ class HousingSalesCrawlerProjApplicationTests {
 
     @Autowired
     private MockMvc mvc;
+
+    private final Logger logger = LoggerFactory.getLogger(getClass());
 
     @Test
     void contextLoads() {
@@ -106,4 +116,40 @@ class HousingSalesCrawlerProjApplicationTests {
         long diff = TimeUnit.DAYS.convert(diffInMillies, TimeUnit.MILLISECONDS);
         System.out.println(diff);
     }
+
+    @Test
+    void getAvailableIDs() {
+        String[] availableIDs = TimeZone.getAvailableIDs();
+        System.out.println(availableIDs.length);
+    }
+
+    @Test
+    void test() {
+        String property = Paths.get(System.getProperty("user.dir")).resolve("fslos.json").toString();
+        System.out.println(property);
+    }
+
+    private synchronized void test1() throws InterruptedException {
+        System.out.println("test1 = " + new Date().getTime());
+        Thread.sleep(6000);
+    }
+
+    private synchronized void test2() {
+        System.out.println("test2 = " + new Date().getTime());
+    }
+
+    public static void main(String[] args) {
+        HousingSalesCrawlerProjApplicationTests tests = new HousingSalesCrawlerProjApplicationTests();
+        new Thread(() -> {
+            try {
+                tests.test1();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }).start();
+        new Thread(() -> {
+            tests.test2();
+        }).start();
+    }
+
 }
