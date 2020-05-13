@@ -11,6 +11,7 @@ import us.codecraft.webmagic.pipeline.Pipeline;
 import us.codecraft.webmagic.utils.FilePersistentBase;
 
 import javax.annotation.PostConstruct;
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
@@ -20,14 +21,15 @@ import java.nio.file.Paths;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Component
-public class FilePipeline extends FilePersistentBase implements Pipeline {
+public class FilePipeline extends FilePersistentBase implements Pipeline, Closeable {
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
@@ -40,57 +42,61 @@ public class FilePipeline extends FilePersistentBase implements Pipeline {
     @Value("${resultItems.modificationTime}")
     private String modificationTime;
 
+    private ConcurrentHashMap<String, Object> fslosData;
+
+    private AtomicReference<String> oldModificationTimeStr = new AtomicReference<>();
+
     private Path path;
 
     @PostConstruct
-    private void init() {
+    private void init() throws IOException {
         path = Paths.get(System.getProperty("user.dir")).resolve(fileName);
+        byte[] bytes = Files.readAllBytes(path);
+        fslosData = new ConcurrentHashMap<>((Map<String, Object>) JSON.parse(new String(bytes, StandardCharsets.UTF_8)));
+        String oldModificationTime = (String) fslosData.get(modificationTime);
+        oldModificationTimeStr.set(oldModificationTime);
     }
+
 
     @Override
     public void process(ResultItems resultItems, Task task) {
-        synchronized (this) {
-            try {
-                logger.info("start persistence ==============================");
-                logger.info("Request.url = " + resultItems.getRequest().getUrl());
-                byte[] bytes = Files.readAllBytes(path);
-                Map<String, Object> fslosData = (Map<String, Object>) JSON.parse(new String(bytes, StandardCharsets.UTF_8));
-                String modificationTimeStr = resultItems.get(modificationTime);
-                String oldModificationTimeStr = (String) fslosData.get(modificationTime);
-                if (oldModificationTimeStr.equals(modificationTimeStr)) {
-                    logger.error("时间比对一致，无需更新, 时间为: " + modificationTimeStr + ", 请求路径为: " + resultItems.getRequest().getUrl());
-                    return;
+        logger.info("start persistence ==============================");
+        logger.info("Request.url = " + resultItems.getRequest().getUrl());
+        String modificationTimeStr = resultItems.get(modificationTime);
+        Pattern pattern = Pattern.compile("(.{4})-(.{1,2})-(.{1,2})");
+        Matcher matcher = pattern.matcher(modificationTimeStr);
+        if (matcher.find()) {
+            String year = matcher.group(1);
+            String month = matcher.group(2);
+            Map<String, Object> fslosDataOfyear = (Map<String, Object>) fslosData.get(year);
+            Integer addData = Integer.valueOf(resultItems.get(key));
+            logger.info("modificationTimeStr = " + modificationTimeStr + ", addData = " + addData);
+            if (fslosDataOfyear == null) {
+                fslosDataOfyear = new ConcurrentHashMap<>();
+                fslosDataOfyear.put(month, addData);
+                fslosData.put(year, fslosDataOfyear);
+            } else {
+                Integer housingSalesForMonth = (Integer) fslosDataOfyear.get(month);
+                logger.info("modificationTimeStr = " + modificationTimeStr + ", housingSalesForMonth = " + housingSalesForMonth);
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
                 }
-                Pattern pattern = Pattern.compile("(.{4})-(.{1,2})-(.{1,2})");
-                Matcher matcher = pattern.matcher(modificationTimeStr);
-                if (matcher.find()) {
-                    String year = matcher.group(1);
-                    String month = matcher.group(2);
-                    Map<String, Object> fslosDataOfyear = (Map<String, Object>) fslosData.get(year);
-                    if (fslosDataOfyear == null) {
-                        fslosDataOfyear = new HashMap<>();
-                        fslosDataOfyear.put(month, Integer.valueOf(resultItems.get(key)));
-                    } else {
-                        Object housingSalesForMonth = fslosDataOfyear.get(month);
-                        if (housingSalesForMonth == null) {
-                            fslosDataOfyear.put(month, Integer.valueOf(resultItems.get(key)));
-                        } else {
-                            fslosDataOfyear.put(month, (int) housingSalesForMonth + Integer.valueOf(resultItems.get(key)));
-                        }
-                    }
-                    if (compareTime(modificationTimeStr, oldModificationTimeStr)) {
-                        fslosData.put(modificationTime, modificationTimeStr);
-                    }
-                    try (PrintWriter printWriter = new PrintWriter(path.toFile())) {
-                        printWriter.write(JSON.toJSONString(fslosData));
-                    }
+                if (housingSalesForMonth == null) {
+                    fslosDataOfyear.put(month, Integer.valueOf(resultItems.get(key)));
+                } else {
+                    fslosDataOfyear.put(month, (int) housingSalesForMonth + Integer.valueOf(resultItems.get(key)));
                 }
-            } catch (IOException e) {
-                logger.warn("write file error", e);
-            } finally {
-                logger.info("end persistence ==============================");
             }
+            oldModificationTimeStr.accumulateAndGet(modificationTimeStr, (preV, curV) -> {
+                if (compareTime(curV, preV)) {
+                    return curV;
+                }
+                return preV;
+            });
         }
+        logger.info("end persistence ==============================");
     }
 
     /**
@@ -108,5 +114,17 @@ public class FilePipeline extends FilePersistentBase implements Pipeline {
             e.printStackTrace();
         }
         return false;
+    }
+
+    /**
+     * @description: 销毁时候，写入数据
+     * 5/13/2020 modified by canno30
+     */
+    @Override
+    public void close() throws IOException {
+        try (PrintWriter printWriter = new PrintWriter(path.toFile())) {
+            fslosData.put(modificationTime, oldModificationTimeStr.get());
+            printWriter.write(JSON.toJSONString(fslosData));
+        }
     }
 }

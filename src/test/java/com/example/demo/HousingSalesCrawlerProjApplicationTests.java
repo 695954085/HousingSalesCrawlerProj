@@ -3,6 +3,7 @@ package com.example.demo;
 import com.example.demo.controller.HousingSalesDataAction;
 import com.example.demo.fsloscrawler.FilePipeline;
 import com.example.demo.fsloscrawler.FslosPageProcessor;
+import org.junit.Assert;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,13 +31,11 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.TimeZone;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertTrue;
 
@@ -150,6 +149,12 @@ class HousingSalesCrawlerProjApplicationTests {
         new Thread(() -> {
             tests.test2();
         }).start();
+    }
+
+    @Test
+    void test3() {
+        Map collect = Arrays.asList().stream().collect(Collectors.toMap(cst -> cst, cst -> new HashMap()));
+        Assert.assertNotNull(collect);
     }
 
 }
