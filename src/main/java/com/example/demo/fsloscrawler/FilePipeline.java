@@ -68,27 +68,32 @@ public class FilePipeline extends FilePersistentBase implements Pipeline, Closea
         if (matcher.find()) {
             String year = matcher.group(1);
             String month = matcher.group(2);
-            Map<String, Object> fslosDataOfyear = (Map<String, Object>) fslosData.get(year);
-            Integer addData = Integer.valueOf(resultItems.get(key));
-            logger.info("modificationTimeStr = " + modificationTimeStr + ", addData = " + addData);
-            if (fslosDataOfyear == null) {
-                fslosDataOfyear = new ConcurrentHashMap<>();
-                fslosDataOfyear.put(month, addData);
-                fslosData.put(year, fslosDataOfyear);
-            } else {
-                Integer housingSalesForMonth = (Integer) fslosDataOfyear.get(month);
-                logger.info("modificationTimeStr = " + modificationTimeStr + ", housingSalesForMonth = " + housingSalesForMonth);
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-                if (housingSalesForMonth == null) {
-                    fslosDataOfyear.put(month, Integer.valueOf(resultItems.get(key)));
+//            try {
+//                // test ~~~~~~~~~~~~~~~~~~~~ code
+//                Thread.sleep(1000);
+//            } catch (InterruptedException e) {
+//                e.printStackTrace();
+//            }
+            // atomic
+            fslosData.compute(year, (mapKey, value) -> {
+                Map<String, Integer> fslosDataOfyear = (Map<String, Integer>) value;
+                Integer addData = Integer.valueOf(resultItems.get(key));
+                logger.info("modificationTimeStr = " + modificationTimeStr + ", addData = " + addData);
+                if (fslosDataOfyear == null) {
+                    fslosDataOfyear = new ConcurrentHashMap<>();
+                    fslosDataOfyear.put(month, addData);
+                    fslosData.put(year, fslosDataOfyear);
                 } else {
-                    fslosDataOfyear.put(month, (int) housingSalesForMonth + Integer.valueOf(resultItems.get(key)));
+                    Integer housingSalesForMonth = fslosDataOfyear.get(month);
+                    logger.info("modificationTimeStr = " + modificationTimeStr + ", housingSalesForMonth = " + housingSalesForMonth);
+                    if (housingSalesForMonth == null) {
+                        fslosDataOfyear.put(month, Integer.valueOf(resultItems.get(key)));
+                    } else {
+                        fslosDataOfyear.put(month, (int) housingSalesForMonth + Integer.valueOf(resultItems.get(key)));
+                    }
                 }
-            }
+                return fslosDataOfyear;
+            });
             oldModificationTimeStr.accumulateAndGet(modificationTimeStr, (preV, curV) -> {
                 if (compareTime(curV, preV)) {
                     return curV;
