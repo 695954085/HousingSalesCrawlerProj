@@ -90,9 +90,26 @@ public class FslosPageProcessor implements PageProcessor {
             }
         }
         // 获取详细页面的房屋销售数字 modified by canno30 on 5/8/2020
-        page.putField(key, page.getHtml().xpath("//table//tr[3]/td[2]//span/text()").match() ? page.getHtml().xpath("//table//tr[3]/td[2]//span/text()").toString().trim() : null);
+        int saleNumber;
+        if ((saleNumber = getKey(page)) == 0) {
+            page.setSkip(true);
+        }
+        page.putField(key, saleNumber);
         page.putField(modificationTime, page.getHtml().xpath("//head/title/text()").regex("(.{4})年(.{1,2})月(.{1,2})日", 0)
                 .replace("年", "-").replace("月", "-").replace("日", "").toString());
+    }
+
+    private int getKey(Page page) {
+        boolean match = page.getHtml().xpath("//table//tr[3]/td[2]//span/text()").match();
+        if (match) {
+            String trim = page.getHtml().xpath("//table//tr[3]/td[2]//span/text()").toString().trim();
+            try {
+                return Integer.valueOf(trim);
+            } catch (NumberFormatException e) {
+                return 0;
+            }
+        }
+        return 0;
     }
 
     private SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd");

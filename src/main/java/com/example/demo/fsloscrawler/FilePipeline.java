@@ -42,7 +42,7 @@ public class FilePipeline extends FilePersistentBase implements Pipeline, Closea
     @Value("${resultItems.modificationTime}")
     private String modificationTime;
 
-    private ConcurrentHashMap<String, Object> fslosData;
+    private ConcurrentHashMap<String, Object> fslosData = new ConcurrentHashMap<>();
 
     private AtomicReference<String> oldModificationTimeStr = new AtomicReference<>();
 
@@ -52,7 +52,14 @@ public class FilePipeline extends FilePersistentBase implements Pipeline, Closea
     private void init() throws IOException {
         path = Paths.get(System.getProperty("user.dir")).resolve(fileName);
         byte[] bytes = Files.readAllBytes(path);
-        fslosData = new ConcurrentHashMap<>((Map<String, Object>) JSON.parse(new String(bytes, StandardCharsets.UTF_8)));
+        Map<String, Object> data = (Map<String, Object>) JSON.parse(new String(bytes, StandardCharsets.UTF_8));
+        data.forEach((key, value) -> {
+            if (value instanceof String) {
+                fslosData.put(key, value);
+            } else {
+                fslosData.put(key, new ConcurrentHashMap((Map) value));
+            }
+        });
         String oldModificationTime = (String) fslosData.get(modificationTime);
         oldModificationTimeStr.set(oldModificationTime);
     }
@@ -60,40 +67,27 @@ public class FilePipeline extends FilePersistentBase implements Pipeline, Closea
 
     @Override
     public void process(ResultItems resultItems, Task task) {
-        logger.info("start persistence ==============================");
-        logger.info("Request.url = " + resultItems.getRequest().getUrl());
         String modificationTimeStr = resultItems.get(modificationTime);
         Pattern pattern = Pattern.compile("(.{4})-(.{1,2})-(.{1,2})");
         Matcher matcher = pattern.matcher(modificationTimeStr);
         if (matcher.find()) {
             String year = matcher.group(1);
             String month = matcher.group(2);
-//            try {
-//                // test ~~~~~~~~~~~~~~~~~~~~ code
-//                Thread.sleep(1000);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
             // atomic
-            fslosData.compute(year, (mapKey, value) -> {
-                Map<String, Integer> fslosDataOfyear = (Map<String, Integer>) value;
-                Integer addData = Integer.valueOf(resultItems.get(key));
-                logger.info("modificationTimeStr = " + modificationTimeStr + ", addData = " + addData);
-                if (fslosDataOfyear == null) {
-                    fslosDataOfyear = new ConcurrentHashMap<>();
-                    fslosDataOfyear.put(month, addData);
-                    fslosData.put(year, fslosDataOfyear);
-                } else {
-                    Integer housingSalesForMonth = fslosDataOfyear.get(month);
-                    logger.info("modificationTimeStr = " + modificationTimeStr + ", housingSalesForMonth = " + housingSalesForMonth);
-                    if (housingSalesForMonth == null) {
-                        fslosDataOfyear.put(month, Integer.valueOf(resultItems.get(key)));
-                    } else {
-                        fslosDataOfyear.put(month, (int) housingSalesForMonth + Integer.valueOf(resultItems.get(key)));
-                    }
-                }
-                return fslosDataOfyear;
+            Integer addData = resultItems.get(key);
+            logger.info("modificationTimeStr = " + modificationTimeStr + ", addData = " + addData);
+            boolean[] flags = new boolean[]{false};
+            fslosData.computeIfAbsent(year, (key) -> {
+                Map<String, Integer> fslosDataOfYear = new ConcurrentHashMap<>();
+                fslosDataOfYear.put(month, addData);
+                flags[0] = true;
+                return fslosDataOfYear;
             });
+            // 循环获取data，以便能获取year对应的值
+            for (ConcurrentHashMap<String, Integer> fslosDataOfYear = (ConcurrentHashMap) fslosData.get(year); !flags[0] && fslosDataOfYear != null; ) {
+                fslosDataOfYear.compute(month, (mapKey, mapValue) -> mapValue == null ? addData : mapValue + addData);
+                break;
+            }
             oldModificationTimeStr.accumulateAndGet(modificationTimeStr, (preV, curV) -> {
                 if (compareTime(curV, preV)) {
                     return curV;
@@ -101,7 +95,6 @@ public class FilePipeline extends FilePersistentBase implements Pipeline, Closea
                 return preV;
             });
         }
-        logger.info("end persistence ==============================");
     }
 
     /**

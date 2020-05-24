@@ -20,6 +20,6 @@ public class ScheduledTasks {
 
     @Scheduled(cron = "0 0 9 * * *")
     public void crawler() {
-        Spider.create(fslosPageProcessor).addPipeline(filePipeline).addUrl(crawlerUrl).thread(5).run();
+        Spider.create(fslosPageProcessor).addPipeline(filePipeline).addUrl(crawlerUrl).thread(20).run();
     }
 }
